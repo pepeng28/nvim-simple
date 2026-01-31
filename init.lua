@@ -51,7 +51,121 @@ require("lazy").setup({
 
   -- Status line
   { "nvim-lualine/lualine.nvim" },
-})
+
+----------------------------------------------------------------
+  -- NVIM TREE = SATU-SATUNYA FILE EXPLORER
+  ----------------------------------------------------------------
+  {
+    'nvim-tree/nvim-tree.lua',
+    dependencies = {
+      'nvim-tree/nvim-web-devicons',
+    },
+
+    config = function()
+      -- Override ikon file
+      require('nvim-web-devicons').set_icon {
+        lua  = { icon = " ", color = "#51a0cf", name = "Lua" },
+        txt  = { icon = "󰈙 ", color = "#89e051", name = "Text" },
+        json = { icon = " ", color = "#cbcb41", name = "Json" },
+        js   = { icon = " ", color = "#f1e05a", name = "Javascript" },
+        html = { icon = " ", color = "#e34c26", name = "Html" },
+        css  = { icon = " ", color = "#563d7c", name = "Css" },
+        md   = { icon = " ", color = "#519aba", name = "Markdown" },
+        sh   = { icon = " ", color = "#89e051", name = "Shell" },
+      }
+
+      -- Shortcut utama
+      vim.keymap.set('n', '<C-e>', ':NvimTreeToggle<CR>', {
+        noremap = true,
+        silent = true
+      })
+
+      require('nvim-tree').setup {
+        view = {
+          side = 'left',
+          width = math.floor(vim.o.columns / 2),  -- setengah layar
+          preserve_window_proportions = true,
+        },
+
+        filters = {
+          dotfiles = false,
+        },
+
+        renderer = {
+          icons = {
+            show = {
+              file = true,
+              folder = true,
+              folder_arrow = true,
+              git = true,
+            },
+
+            glyphs = {
+              default = " ",
+              symlink = " ",
+              folder = {
+                arrow_closed = " ",
+                arrow_open   = " ",
+                default      = " ",
+                open         = " ",
+                empty        = " ",
+                empty_open   = " ",
+                symlink      = " ",
+                symlink_open = " ",
+              },
+            },
+          },
+        },
+      }
+    end,
+  },
+
+  {
+  "utilyre/barbecue.nvim",
+  name = "barbecue",
+  version = "*",
+  dependencies = {
+    "nvim-tree/nvim-web-devicons", -- ikon file
+    "SmiteshP/nvim-navic",         -- optional untuk LSP symbols
+  },
+  config = function()
+    require("barbecue").setup({
+      show_modified = false,      -- tanda file berubah
+      kinds = {
+        File      = " ",         -- ikon file + spasi
+        Module    = " ",
+        Namespace = " ",
+        Package   = " ",
+        Class     = " ",
+        Method    = " ",
+        Property  = " ",
+        Field     = " ",
+        Constructor = " ",
+        Enum      = " ",
+        Interface = " ",
+        Function  = " ",
+        Variable  = " ",
+        Constant  = " ",
+        String    = " ",
+        Number    = " ",
+        Boolean   = " ",
+        Array     = " ",
+        Object    = " ",
+        Key       = " ",
+        Null      = " ",
+        EnumMember= " ",
+        Struct    = " ",
+        Event     = " ",
+        Operator  = " ",
+        TypeParameter = " ",
+      },
+      symbols = {
+        separator = "┃",          -- pemisah bar
+      },
+    })
+  end,
+},
+}) --batas nya
 
 -- =========================
 -- 3. Theme
@@ -82,6 +196,7 @@ vim.o.showmode = false -- lualine menampilkan mode
 -- =========================
 local map = vim.api.nvim_set_keymap
 local opts = { noremap = true, silent = true }
+
 
 -- Telescope keymaps
 map("n", "<Leader>ff", "<cmd>Telescope find_files<cr>", opts)
@@ -188,3 +303,6 @@ require('lualine').setup {
 vim.cmd [[
   autocmd BufRead,BufNewFile *.html set filetype=html
 ]]
+
+-- Normal mode: Ctrl+Q keluar paksa
+vim.api.nvim_set_keymap('n', '<C-q>', ':q!<CR>', { noremap = true, silent = true })
