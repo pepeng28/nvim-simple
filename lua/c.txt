@@ -1,0 +1,182 @@
+local api = vim.api
+
+local opened_items = {}
+local current_index = 0
+local max_history = 50
+local show_full_path = false
+local show_only_current = false -- toggle untuk sembunyikan history
+local force_yellow = false      -- semua file kuning saat Ctrl+Up
+
+-- WARNA TEKS
+vim.api.nvim_set_hl(0, "WinbarActiveFile",     { fg = "#FFFF00" }) -- file aktif kuning
+vim.api.nvim_set_hl(0, "WinbarInactiveFile",   { fg = "#5F87AF" }) -- file tidak aktif kebiruan
+vim.api.nvim_set_hl(0, "WinbarFolder",         { fg = "#3A5F7F" }) -- folder lebih pekat
+
+-- WARNA ICON CUSTOM
+local icon_colors = {
+    folder  = "#3A5F7F",
+    file    = "#5F87AF",
+    lua     = "#339933",
+    html    = "#FFA500",
+    css     = "#56B6C2",
+    js      = "#E5C07B",
+    json    = "#C678DD",
+    php     = "#61AFEF",
+}
+
+-- ICON CUSTOM
+local icons = {
+    folder = { icon = "", color = icon_colors.folder },
+    file   = { icon = "󰈔", color = icon_colors.file },
+    lua    = { icon = "", color = icon_colors.lua },
+    html   = { icon = "", color = icon_colors.html },
+    css    = { icon = "", color = icon_colors.css },
+    js     = { icon = "", color = icon_colors.js },
+    json   = { icon = "", color = icon_colors.json },
+    php    = { icon = "", color = icon_colors.php },
+}
+
+-- FUNGSI AMAN UNTUK WINBAR
+local function safe_winbar_set(text)
+    if not text or text:match("^%s*$") then
+        vim.opt.winbar = nil
+        return
+    end
+    vim.opt.winbar = text
+end
+
+local function get_icon(path, is_folder)
+    if not path or path == "" then return "" end
+    if is_folder then
+        return "%#WinbarFolder#" .. (icons.folder.icon or "") .. "%*"
+    end
+    local ext = path:match("^.+%.(.+)$")
+    local icon_data = icons[ext] or icons.file
+    local icon = icon_data.icon or ""
+    local color = icon_data.color or "#FFFFFF"
+    vim.api.nvim_set_hl(0, "TmpIcon", { fg = color })
+    return "%#TmpIcon#" .. icon .. "%*"
+end
+
+local function should_track(path)
+    if not path or path == "" then return false end
+    if path:match("NvimTree") then return false end
+    if path:match("/%.git") then return false end
+    if path:match("term://") then return false end
+    if path:match("help") then return false end
+    return true
+end
+
+-- AUTOCMD UNTUK HISTORY
+vim.api.nvim_create_autocmd({"BufEnter","BufNewFile"}, {
+    callback = function()
+        local fpath = vim.fn.expand("%:p")
+        if not should_track(fpath) then return end
+
+        for i, item in ipairs(opened_items) do
+            if item.path == fpath then
+                current_index = i
+                return
+            end
+        end
+
+        local label = vim.fn.fnamemodify(fpath, ":t")    
+        local base_folder = vim.fn.fnamemodify(fpath, ":h")    
+        table.insert(opened_items, { label = label, path = fpath, base_folder = base_folder })    
+        current_index = #opened_items    
+
+        if #opened_items > max_history then    
+            table.remove(opened_items, 1)    
+            current_index = current_index - 1    
+        end
+    end,
+})
+
+-- RENDER WINBAR
+local function render_winbar()
+    if #opened_items == 0 or not opened_items[current_index] then
+        vim.opt.winbar = nil
+        return
+    end
+
+    local parts = {}
+    local sep = " » "
+
+    -- jika hide history, tampilkan hanya file aktif
+    local items_to_render = opened_items
+    if show_only_current then
+        items_to_render = { opened_items[current_index] }
+    end
+
+    for i, item in ipairs(items_to_render) do
+        if not item.path or item.path == "" then goto continue end
+
+        local folder_text = ""
+        if item.base_folder and item.base_folder ~= "" then
+            local folder_name = vim.fn.fnamemodify(item.base_folder, ":t")
+            folder_text = get_icon(item.base_folder, true) .. " " .. "%#WinbarFolder#" .. folder_name .. "%*"
+        end
+
+        local file_name = vim.fn.fnamemodify(item.path, ":t")
+
+        -- warna file
+        local file_text = get_icon(item.path, false) .. " " ..
+            (force_yellow and "%#WinbarActiveFile#" or (i == current_index and "%#WinbarActiveFile#" or "%#WinbarInactiveFile#")) ..
+            file_name .. "%*"
+
+        local text
+        if show_full_path and item.base_folder and item.base_folder ~= "" then
+            local relative = vim.fn.fnamemodify(item.path, ":." .. item.base_folder)
+            local path_parts = vim.split(relative, "/")
+            local path_texts = {}
+            for _, p in ipairs(path_parts) do
+                table.insert(path_texts, "%#WinbarFolder#" .. p .. "%*")
+            end
+            text = table.concat(path_texts, sep) .. sep .. file_text
+        else
+            text = folder_text .. sep .. file_text
+        end
+
+        table.insert(parts, text)
+        ::continue::
+    end
+
+    safe_winbar_set(table.concat(parts, " ┃ "))
+end
+
+vim.api.nvim_create_autocmd(
+    {"BufEnter","BufWritePost","BufNewFile"},
+    { callback = render_winbar }
+)
+
+-- NAVIGASI HISTORY
+local function goto_item(index)
+    if index < 1 or index > #opened_items then return end
+    local item = opened_items[index]
+    vim.cmd("edit " .. item.path)
+    current_index = index
+    render_winbar()
+end
+
+vim.keymap.set('n', '<C-Right>', function()
+    goto_item(current_index + 1)
+end)
+
+vim.keymap.set('n', '<C-Left>', function()
+    goto_item(current_index - 1)
+end)
+
+-- TOGGLE FULL PATH DAN HIDE HISTORY
+vim.keymap.set('n', '<C-Up>', function()
+    show_full_path = true
+    show_only_current = true -- sembunyikan semua selain file aktif
+    force_yellow = true      -- file aktif jadi kuning
+    render_winbar()
+end)
+
+vim.keymap.set('n', '<C-Down>', function()
+    show_full_path = false
+    show_only_current = false -- tampilkan semua history lagi
+    force_yellow = false      -- warna kembali normal
+    render_winbar()
+end)

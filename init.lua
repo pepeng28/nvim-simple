@@ -3,6 +3,8 @@
 -- HTML / JS/TS / Python + Mason + LSP + Snippets + nvim-cmp + Treesitter + Lualine + Telescope
 -- Fully functional, autocomplete HTML tags, snippets ready
 -- =========================================
+-- Set tags file untuk Neovim
+vim.opt.tags = "./tags;,~/.tags"
 
 -- =========================
 -- 1. Lazy.nvim (Plugin Manager)
@@ -20,8 +22,6 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
-
-require("polish")
 -- =========================
 -- 2. Plugins
 -- =========================
@@ -36,6 +36,8 @@ require("lazy").setup({
   { "neovim/nvim-lspconfig" },
   { "williamboman/mason.nvim" },
   { "williamboman/mason-lspconfig.nvim" },
+  -- LSP symbols
+  { "SmiteshP/nvim-navic" },
 
   -- Completion
   { "hrsh7th/nvim-cmp" },
@@ -53,119 +55,102 @@ require("lazy").setup({
   { "nvim-lualine/lualine.nvim" },
 
 ----------------------------------------------------------------
-  -- NVIM TREE = SATU-SATUNYA FILE EXPLORER
+  -- NVIM TREE = SATU-SATUNYA FILE EXPLORER Dan Icon Global
   ----------------------------------------------------------------
-  {
-    'nvim-tree/nvim-tree.lua',
-    dependencies = {
-      'nvim-tree/nvim-web-devicons',
-    },
+ {
+  'nvim-tree/nvim-tree.lua',
+  dependencies = {
+    'nvim-tree/nvim-web-devicons',
+  },
 
-    config = function()
-      -- Override ikon file
-      require('nvim-web-devicons').set_icon {
-        lua  = { icon = " ", color = "#51a0cf", name = "Lua" },
-        txt  = { icon = "󰈙 ", color = "#89e051", name = "Text" },
-        json = { icon = " ", color = "#cbcb41", name = "Json" },
-        js   = { icon = " ", color = "#f1e05a", name = "Javascript" },
-        html = { icon = " ", color = "#e34c26", name = "Html" },
-        css  = { icon = " ", color = "#563d7c", name = "Css" },
-        md   = { icon = " ", color = "#519aba", name = "Markdown" },
-        sh   = { icon = " ", color = "#89e051", name = "Shell" },
-      }
+  config = function()
 
-      -- Shortcut utama
-      vim.keymap.set('n', '<C-e>', ':NvimTreeToggle<CR>', {
-        noremap = true,
-        silent = true
-      })
+    vim.keymap.set('n', '<C-e>', ':NvimTreeToggle<CR>', {
+      noremap = true,
+      silent = true
+    })
 
-      require('nvim-tree').setup {
-        view = {
-          side = 'left',
-          width = math.floor(vim.o.columns / 2),  -- setengah layar
-          preserve_window_proportions = true,
-        },
+    require('nvim-tree').setup {
 
-        filters = {
-          dotfiles = false,
-        },
+      view = {
+        side = 'left',
+        width = math.floor(vim.o.columns / 2),
+        preserve_window_proportions = true,
+      },
 
-        renderer = {
-          icons = {
-            show = {
-              file = true,
-              folder = true,
-              folder_arrow = true,
-              git = true,
-            },
+      filters = {
+        dotfiles = false,
+      },
 
-            glyphs = {
-              default = " ",
-              symlink = " ",
-              folder = {
-                arrow_closed = " ",
-                arrow_open   = " ",
-                default      = " ",
-                open         = " ",
-                empty        = " ",
-                empty_open   = " ",
-                symlink      = " ",
-                symlink_open = " ",
-              },
+      renderer = {
+        icons = {
+          show = {
+            file = true,
+            folder = true,
+            folder_arrow = true,
+            git = true,
+          },
+
+          -- INI CUSTOM KHUSUS NVIM-TREE SAJA
+          glyphs = {
+            default = " ",
+            folder = {
+              arrow_closed = " ",
+              arrow_open   = " ",
+              default      = " ",
+              open         = " ",
+              empty        = " ",
+              empty_open   = " ",
+              symlink      = " ",
+              symlink_open = " ",
             },
           },
         },
-      }
-    end,
-  },
-
-  {
-  "utilyre/barbecue.nvim",
-  name = "barbecue",
-  version = "*",
-  dependencies = {
-    "nvim-tree/nvim-web-devicons", -- ikon file
-    "SmiteshP/nvim-navic",         -- optional untuk LSP symbols
-  },
-  config = function()
-    require("barbecue").setup({
-      show_modified = false,      -- tanda file berubah
-      kinds = {
-        File      = " ",         -- ikon file + spasi
-        Module    = " ",
-        Namespace = " ",
-        Package   = " ",
-        Class     = " ",
-        Method    = " ",
-        Property  = " ",
-        Field     = " ",
-        Constructor = " ",
-        Enum      = " ",
-        Interface = " ",
-        Function  = " ",
-        Variable  = " ",
-        Constant  = " ",
-        String    = " ",
-        Number    = " ",
-        Boolean   = " ",
-        Array     = " ",
-        Object    = " ",
-        Key       = " ",
-        Null      = " ",
-        EnumMember= " ",
-        Struct    = " ",
-        Event     = " ",
-        Operator  = " ",
-        TypeParameter = " ",
       },
-      symbols = {
-        separator = "┃",          -- pemisah bar
-      },
-    })
+    }
   end,
 },
-}) --batas nya
+-- kalau pakai lazy.nvim
+{
+  "akinsho/toggleterm.nvim",
+  version = "*",
+  config = function()
+    require("toggleterm").setup{
+      -- pengaturan default, bisa dikustom
+      size = 15,
+      open_mapping = [[<c-\>]],
+      direction = "horizontal",
+    }
+  end
+},
+}) --batas nya _
+
+-- auto ambil plugins
+local plugin_path = vim.fn.stdpath("config") .. "/lua/plugins"
+local plugins = {}
+
+for _, file in ipairs(vim.fn.glob(plugin_path .. "/*.lua", true, true)) do
+  local name = file:match("^.+/(.+)%.lua$")
+  local ok, mod = pcall(require, "plugins." .. name)
+  if ok and type(mod) == "table" then
+    for _, p in ipairs(mod) do
+      table.insert(plugins, p)
+    end
+  elseif not ok then
+    print("Gagal load plugin:", name, mod)
+  end
+end
+
+-- Jalankan setup untuk semua plugin yang ada setup()
+for _, plugin in ipairs(plugins) do
+  if plugin.setup then
+    plugin.setup()
+  end
+end
+
+-- panggil konfigurasi LSP
+require("lsp")
+require("polish")
 
 -- =========================
 -- 3. Theme
@@ -191,42 +176,6 @@ vim.o.cursorline = true
 vim.o.scrolloff = 8
 vim.o.showmode = false -- lualine menampilkan mode
 
--- =========================
--- 6. Keymaps
--- =========================
-local map = vim.api.nvim_set_keymap
-local opts = { noremap = true, silent = true }
-
-
--- Telescope keymaps
-map("n", "<Leader>ff", "<cmd>Telescope find_files<cr>", opts)
-map("n", "<Leader>fg", "<cmd>Telescope live_grep<cr>", opts)
-map("n", "<Leader>fb", "<cmd>Telescope buffers<cr>", opts)
-map("n", "<Leader>fh", "<cmd>Telescope help_tags<cr>", opts)
-
--- =========================
--- 7. Mason Setup
--- =========================
-require("mason").setup()
-require("mason-lspconfig").setup({
-  ensure_installed = { "pyright", "ts_ls", "html" },
-  automatic_installation = true,
-})
-
--- =========================
--- 8. LSP Setup Modern
--- =========================
--- Helper function: attach LSP if executable tersedia
-local function attach_lsp(name, cmd, ft)
-  if vim.fn.executable(cmd[1]) == 1 then
-    vim.lsp.start({
-      name = name,
-      cmd = cmd,
-      filetypes = ft,
-    })
-  end
-end
-
 -- Auto attach per FileType
 vim.api.nvim_create_autocmd("FileType", {
   pattern = {"python","javascript","typescript","typescriptreact","html"},
@@ -244,29 +193,6 @@ vim.api.nvim_create_autocmd("FileType", {
     end
   end
 })
-
--- =========================
--- 9. nvim-cmp + vsnip setup
--- =========================
-local cmp = require("cmp")
-cmp.setup({
-  snippet = {
-    expand = function(args)
-      vim.fn["vsnip#anonymous"](args.body)
-    end,
-  },
-  mapping = cmp.mapping.preset.insert({
-    ["<C-n>"] = cmp.mapping.select_next_item(),
-    ["<C-p>"] = cmp.mapping.select_prev_item(),
-    ["<CR>"] = cmp.mapping.confirm({ select = true }),
-    ["<C-Space>"] = cmp.mapping.complete(),
-  }),
-  sources = cmp.config.sources({
-    { name = "nvim_lsp" },
-    { name = "vsnip" },
-  })
-})
-
 -- =========================
 -- 10. Highlight Yank
 -- =========================
@@ -297,12 +223,116 @@ require('lualine').setup {
   }
 }
 
--- =========================
--- 12. Ensure HTML filetype
--- =========================
-vim.cmd [[
-  autocmd BufRead,BufNewFile *.html set filetype=html
-]]
+-- Set leader
+vim.g.mapleader = " "
 
--- Normal mode: Ctrl+Q keluar paksa
-vim.api.nvim_set_keymap('n', '<C-q>', ':q!<CR>', { noremap = true, silent = true })
+-- Daftar shortcut
+local shortcuts = {
+  { icon = " ", desc = "Explore File", cmd = function() vim.cmd("NvimTreeToggle") end, color = "Yellow" },
+  { icon = " ", desc = "Save File", cmd = function() vim.cmd("write") end, color = "Green" },
+  { icon = " ", desc = "Quit Nvim", cmd = function() vim.cmd("quit") end, color = "Red" },
+  { icon = " ", desc = "Terminal Float", cmd = function() vim.cmd("ToggleTerm direction=float") end, color = "Cyan" },
+  { icon = " ", desc = "Terminal Horizontal", cmd = function() vim.cmd("ToggleTerm direction=horizontal") end, color = "Cyan" },
+  { icon = " ", desc = "Plugins", cmd = function() vim.cmd("Mason") end, color = "Green" },
+}
+
+-- State menu popup
+local menu_state = { buf = nil, win = nil }
+
+-- Warna highlight
+local hl_colors = {
+  Red = "ErrorMsg",
+  Green = "String",
+  Yellow = "WarningMsg",
+  Cyan = "Question",
+}
+
+-- Fungsi toggle menu
+local function toggle_menu()
+  -- Tutup menu jika sudah terbuka
+  if menu_state.win and vim.api.nvim_win_is_valid(menu_state.win) then
+    vim.api.nvim_win_close(menu_state.win, true)
+    menu_state.win = nil
+    menu_state.buf = nil
+    return
+  end
+
+  -- Buat buffer baru untuk menu
+  local buf = vim.api.nvim_create_buf(false, true)
+  if not buf then return end
+
+  -- Isi menu: 1 baris per shortcut
+  local lines = {}
+  for _, s in ipairs(shortcuts) do
+    table.insert(lines, s.icon .. " " .. s.desc)
+  end
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+  -- Tentukan ukuran popup
+  local width = 40
+  local height = math.min(#lines, 10) -- maksimal 10 baris, nanti bisa scroll
+  local editor_height = vim.api.nvim_get_option("lines") - vim.api.nvim_get_option("cmdheight") - 1
+  local row = math.max(0, editor_height - height - 2)
+  local col = math.max(0, math.floor((vim.o.columns - width) / 2))
+
+  -- Opsi window popup
+  local opts = {
+    style = "minimal",
+    relative = "editor",
+    width = width,
+    height = height,
+    row = row,
+    col = col,
+    border = "single",
+  }
+
+  local win = vim.api.nvim_open_win(buf, true, opts)
+  if not win then
+    print("Gagal membuka popup menu")
+    return
+  end
+
+  -- Highlight tiap baris
+  for i, s in ipairs(shortcuts) do
+    local hl = hl_colors[s.color] or "Normal"
+    vim.api.nvim_buf_add_highlight(buf, -1, hl, i-1, 0, -1)
+  end
+
+  -- Posisi kursor di awal teks setelah icon
+  local first_line_text = lines[1]
+  local start_col = first_line_text:find("%S", #shortcuts[1].icon + 1) - 1
+  start_col = start_col or (#shortcuts[1].icon + 1)
+  vim.api.nvim_win_set_cursor(win, {1, start_col})
+
+  -- Mapping Enter untuk menjalankan shortcut
+  vim.keymap.set("n", "<CR>", function()
+    local line = vim.api.nvim_win_get_cursor(win)[1]
+    local choice = shortcuts[line]
+    if choice then
+      vim.api.nvim_win_close(win, true)
+      menu_state.win = nil
+      menu_state.buf = nil
+      choice.cmd()
+    end
+  end, { buffer = buf })
+
+  -- Scroll menu jika banyak item
+  vim.keymap.set("n", "<Down>", function()
+    local cur = vim.api.nvim_win_get_cursor(win)
+    local next_line = math.min(cur[1] + 1, #lines)
+    vim.api.nvim_win_set_cursor(win, {next_line, cur[2]})
+  end, { buffer = buf })
+
+  vim.keymap.set("n", "<Up>", function()
+    local cur = vim.api.nvim_win_get_cursor(win)
+    local prev_line = math.max(cur[1] - 1, 1)
+    vim.api.nvim_win_set_cursor(win, {prev_line, cur[2]})
+  end, { buffer = buf })
+
+  -- Simpan state menu
+  menu_state.buf = buf
+  menu_state.win = win
+end
+
+-- Mapping Space untuk toggle menu
+vim.keymap.set("n", "<Space>", toggle_menu, { desc = "Toggle Shortcut Menu" })
