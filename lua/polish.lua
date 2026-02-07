@@ -1,3 +1,4 @@
+
 -- Clipboard Android Termux
 vim.g.clipboard = {
   name = "termux",
@@ -6,6 +7,7 @@ vim.g.clipboard = {
   cache_enabled = 0,
 }
 vim.opt.clipboard = "unnamedplus"
+
 
 -- Key mapping
 local map = vim.keymap.set
