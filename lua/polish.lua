@@ -1,4 +1,3 @@
-
 -- Clipboard Android Termux
 vim.g.clipboard = {
   name = "termux",

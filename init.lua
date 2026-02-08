@@ -49,7 +49,17 @@ require("lazy").setup({
   { "rafamadriz/friendly-snippets" }, -- snippet umum HTML/JS/Python
 
   -- Theme
-  { "folke/tokyonight.nvim" },
+ -- { "folke/tokyonight.nvim" },
+{
+  "navarasu/onedark.nvim",
+  priority = 1000,
+  config = function()
+    require("onedark").setup({
+      style = "deep",
+    })
+    require("onedark").load()
+  end,
+},
 
   -- Status line
   { "nvim-lualine/lualine.nvim" },
@@ -155,8 +165,9 @@ require("polish")
 -- =========================
 -- 3. Theme
 -- =========================
-vim.o.termguicolors = true
-vim.cmd([[colorscheme tokyonight-storm]])
+--vim.o.termguicolors = true
+--vim.cmd([[colorscheme tokyonight-storm]])
+
 
 -- =========================
 -- 4. Line Numbers
@@ -181,7 +192,7 @@ vim.api.nvim_create_autocmd("FileType", {
   pattern = {"python","javascript","typescript","typescriptreact","html"},
   callback = function()
     local ft = vim.bo.filetype
-    local clients = vim.lsp.get_active_clients({bufnr = 0})
+    local clients = vim.lsp.get_clients({bufnr = 0})    
     if #clients == 0 then
       if ft == "python" then
         attach_lsp("pyright", {"pyright-langserver","--stdio"}, {"python"})
@@ -208,7 +219,8 @@ vim.cmd [[
 -- =========================
 require('lualine').setup {
   options = {
-    theme = 'tokyonight',
+    --theme = 'tokyonight',
+    theme = 'onedark',
     section_separators = '',
     component_separators = '',
     globalstatus = true,
@@ -228,12 +240,12 @@ vim.g.mapleader = " "
 
 -- Daftar shortcut
 local shortcuts = {
-  { icon = " ", desc = "Explore File", cmd = function() vim.cmd("NvimTreeToggle") end, color = "Yellow" },
-  { icon = " ", desc = "Save File", cmd = function() vim.cmd("write") end, color = "Green" },
-  { icon = " ", desc = "Quit Nvim", cmd = function() vim.cmd("quit") end, color = "Red" },
-  { icon = " ", desc = "Terminal Float", cmd = function() vim.cmd("ToggleTerm direction=float") end, color = "Cyan" },
-  { icon = " ", desc = "Terminal Horizontal", cmd = function() vim.cmd("ToggleTerm direction=horizontal") end, color = "Cyan" },
-  { icon = " ", desc = "Plugins", cmd = function() vim.cmd("Mason") end, color = "Green" },
+  { icon = "  ", desc = "Explore File", cmd = function() vim.cmd("NvimTreeToggle") end, color = "Yellow" },
+  { icon = "  ", desc = "Save File", cmd = function() vim.cmd("write") end, color = "Green" },
+  { icon = "  ", desc = "Quit Nvim", cmd = function() vim.cmd("quit") end, color = "Red" },
+  { icon = "  ", desc = "Terminal Float", cmd = function() vim.cmd("ToggleTerm direction=float") end, color = "Cyan" },
+  { icon = "  ", desc = "Terminal Horizontal", cmd = function() vim.cmd("ToggleTerm direction=horizontal") end, color = "Cyan" },
+  { icon = "  ", desc = "Plugins", cmd = function() vim.cmd("Mason") end, color = "Green" },
 }
 
 -- State menu popup
@@ -336,3 +348,14 @@ end
 
 -- Mapping Space untuk toggle menu
 vim.keymap.set("n", "<Space>", toggle_menu, { desc = "Toggle Shortcut Menu" })
+
+-- Tambahkan ini di akhir init.lua
+vim.api.nvim_create_autocmd("VimEnter", {
+    callback = function()
+        local ok, winbar = pcall(require, "plugins.winbarEl")
+        if ok then
+            winbar.setup()
+        end
+    end
+})
+
