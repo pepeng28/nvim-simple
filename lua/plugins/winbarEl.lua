@@ -22,11 +22,14 @@ local winbar_cache = {}
 local cwd = vim.fn.getcwd()
 -- Store original content for comparison
 local original_content_cache = {}
+-- Track new files that haven't been saved yet
+local unsaved_new_files = {}
 
 --------------------------------------------------------------------
 -- UTILITY FUNCTIONS
 --------------------------------------------------------------------
 local function normalize_content(str)
+    if not str then return "" end
     return str:gsub("\r", ""):gsub("\n+$", "")
 end
 
@@ -34,14 +37,23 @@ end
 local function save_original_content(buf_id, file_path)
     if original_content_cache[buf_id] then return end
     
+    -- Untuk file baru yang belum ada di disk, tandai sebagai file baru
+    if file_path == "" or vim.fn.filereadable(file_path) ~= 1 then
+        original_content_cache[buf_id] = ""
+        unsaved_new_files[buf_id] = true
+        return
+    end
+    
     local f = io.open(file_path, "r")
     if f then
         local content = f:read("*a")
         f:close()
         original_content_cache[buf_id] = normalize_content(content)
+        unsaved_new_files[buf_id] = nil
     else
         -- Untuk file baru yang belum ada di disk
         original_content_cache[buf_id] = ""
+        unsaved_new_files[buf_id] = true
     end
 end
 
@@ -49,6 +61,11 @@ end
 local function is_buffer_modified(buf_id, file_path)
     if not buf_id or buf_id == -1 then return false end
     if not vim.api.nvim_buf_is_loaded(buf_id) then return false end
+    
+    -- File baru yang belum disimpan selalu dianggap modified
+    if unsaved_new_files[buf_id] then
+        return true
+    end
     
     -- Dapatkan konten buffer saat ini
     local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
@@ -60,10 +77,14 @@ local function is_buffer_modified(buf_id, file_path)
         return current_content ~= original_content_cache[buf_id]
     end
     
-    -- Jika tidak ada cache, cek vs disk
+    -- Jika tidak ada cache dan file belum ada di disk
+    if file_path == "" or vim.fn.filereadable(file_path) ~= 1 then
+        return current_content ~= ""
+    end
+    
+    -- Cek vs disk untuk file yang sudah ada
     local f = io.open(file_path, "r")
     if not f then
-        -- File belum ada di disk
         return current_content ~= ""
     end
     
@@ -81,6 +102,11 @@ local function update_original_content_after_save(buf_id, file_path)
         local content = f:read("*a")
         f:close()
         original_content_cache[buf_id] = normalize_content(content)
+        unsaved_new_files[buf_id] = nil
+    else
+        -- File mungkin baru dibuat, update dengan konten kosong
+        original_content_cache[buf_id] = ""
+        unsaved_new_files[buf_id] = nil
     end
 end
 
@@ -174,6 +200,9 @@ local function should_track(path)
     if path:match("/%.git") then return false end
     if path:match("term://") then return false end
     if path:match("help") then return false end
+    -- Tambahkan pengecualian untuk buftype khusus
+    local bufnr = vim.fn.bufnr(path)
+    if bufnr ~= -1 and vim.bo[bufnr].buftype ~= "" then return false end
     return true
 end
 
@@ -353,7 +382,8 @@ local function apply_tracking()
         end
     end
 
-    if not found and vim.fn.filereadable(fpath) == 1 then
+    -- TIDAK memeriksa filereadable() untuk file baru
+    if not found then
         table.insert(M.opened_items, {
             label = vim.fn.fnamemodify(fpath, ":t"),
             path = fpath
@@ -361,7 +391,7 @@ local function apply_tracking()
         M.current_index = #M.opened_items
     end
 
-    -- Simpan konten asli saat pertama kali track
+    -- Simpan konten asli untuk file baru (kosong) atau file yang sudah ada
     if M.config.auto_save then
         save_original_content(buf_id, fpath)
     end
@@ -542,6 +572,42 @@ function M.setup(user_config)
 
     local group = api.nvim_create_augroup("WinbarEl", { clear = true })
     
+    -- Handle new files immediately
+    api.nvim_create_autocmd("BufNewFile", {
+        group = group,
+        callback = function(args)
+            local buf_id = args.buf
+            local fpath = vim.api.nvim_buf_get_name(buf_id)
+            
+            if should_track(fpath) and not is_window_filtered() then
+                -- Simpan sebagai file baru yang belum disimpan
+                unsaved_new_files[buf_id] = true
+                original_content_cache[buf_id] = ""
+                
+                -- Tambahkan ke opened_items jika belum ada
+                local found = false
+                for i, item in ipairs(M.opened_items) do
+                    if item.path == fpath then
+                        M.current_index = i
+                        found = true
+                        break
+                    end
+                end
+                
+                if not found then
+                    table.insert(M.opened_items, {
+                        label = vim.fn.fnamemodify(fpath, ":t"),
+                        path = fpath
+                    })
+                    M.current_index = #M.opened_items
+                end
+                
+                winbar_cache = {}
+                update_winbar()
+            end
+        end
+    })
+    
     api.nvim_create_autocmd({ "BufEnter", "WinEnter", "BufWinEnter" }, {
         group = group,
         callback = function()
@@ -559,8 +625,19 @@ function M.setup(user_config)
         end,
     })
 
+    -- Trigger untuk update winbar saat membuat buffer baru
+    api.nvim_create_autocmd({ "BufAdd", "BufNew" }, {
+        group = group,
+        callback = function()
+            vim.defer_fn(function()
+                apply_tracking()
+                update_winbar()
+            end, 10)
+        end
+    })
+
     -- Real-time modification detection
-    api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+    api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "InsertEnter" }, {
         group = group,
         callback = function()
             winbar_cache = {}
@@ -626,6 +703,7 @@ function M.setup(user_config)
         group = group,
         callback = function(args)
             original_content_cache[args.buf] = nil
+            unsaved_new_files[args.buf] = nil
         end
     })
 
