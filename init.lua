@@ -26,8 +26,7 @@ vim.opt.rtp:prepend(lazypath)
 -- 2. Plugins
 -- =========================
 require("lazy").setup({
-  -- Treesitter
-  { "nvim-treesitter/nvim-treesitter", run = ":TSUpdate" },
+
 
   -- Telescope
   { "nvim-telescope/telescope.nvim", dependencies = { "nvim-lua/plenary.nvim" } },
@@ -133,30 +132,28 @@ require("lazy").setup({
     }
   end
 },
+    {
+          "mattn/emmet-vim",
+              event = "BufReadPre",  -- atau "FileType"
+                  ft = { "html", "css", "javascript", "javascriptreact" },
+                      init = function()
+                              vim.g.user_emmet_expandabbr_key = "<Tab>"
+                                  end,
+  },
 }) --batas nya _
 
--- auto ambil plugins
-local plugin_path = vim.fn.stdpath("config") .. "/lua/plugins"
-local plugins = {}
-
-for _, file in ipairs(vim.fn.glob(plugin_path .. "/*.lua", true, true)) do
+-- auto-load semua core
+local core_path = vim.fn.stdpath("config") .. "/lua/core"
+for _, file in ipairs(vim.fn.glob(core_path .. "/*.lua", true, true)) do
   local name = file:match("^.+/(.+)%.lua$")
-  local ok, mod = pcall(require, "plugins." .. name)
-  if ok and type(mod) == "table" then
-    for _, p in ipairs(mod) do
-      table.insert(plugins, p)
-    end
-  elseif not ok then
-    print("Gagal load plugin:", name, mod)
+  local ok, err = pcall(require, "core." .. name)
+  if not ok then
+    print("Gagal load core:", name, err)
   end
 end
 
--- Jalankan setup untuk semua plugin yang ada setup()
-for _, plugin in ipairs(plugins) do
-  if plugin.setup then
-    plugin.setup()
-  end
-end
+-- auto-load semua plugin via lazy.nvim
+require("lazy").setup("plugins")
 
 -- panggil konfigurasi LSP
 require("lsp")
@@ -187,23 +184,6 @@ vim.o.cursorline = true
 vim.o.scrolloff = 8
 vim.o.showmode = false -- lualine menampilkan mode
 
--- Auto attach per FileType
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = {"python","javascript","typescript","typescriptreact","html"},
-  callback = function()
-    local ft = vim.bo.filetype
-    local clients = vim.lsp.get_clients({bufnr = 0})    
-    if #clients == 0 then
-      if ft == "python" then
-        attach_lsp("pyright", {"pyright-langserver","--stdio"}, {"python"})
-      elseif ft == "javascript" or ft == "typescript" or ft == "typescriptreact" then
-        attach_lsp("ts_ls", {"typescript-language-server","--stdio"}, {ft})
-      elseif ft == "html" then
-        attach_lsp("html", {"vscode-html-language-server","--stdio"}, {"html"})
-      end
-    end
-  end
-})
 -- =========================
 -- 10. Highlight Yank
 -- =========================
