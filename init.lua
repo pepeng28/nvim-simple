@@ -142,6 +142,8 @@ require("lazy").setup({
   },
 }) --batas nya _
 
+require("plugins.winbarEl").setup()
+
 -- auto-load semua core
 local core_path = vim.fn.stdpath("config") .. "/lua/core"
 for _, file in ipairs(vim.fn.glob(core_path .. "/*.lua", true, true)) do
@@ -152,8 +154,7 @@ for _, file in ipairs(vim.fn.glob(core_path .. "/*.lua", true, true)) do
   end
 end
 
--- auto-load semua plugin via lazy.nvim
-require("lazy").setup("plugins")
+
 
 -- panggil konfigurasi LSP
 require("lsp")
@@ -329,13 +330,4 @@ end
 -- Mapping Space untuk toggle menu
 vim.keymap.set("n", "<Space>", toggle_menu, { desc = "Toggle Shortcut Menu" })
 
--- Tambahkan ini di akhir init.lua
-vim.api.nvim_create_autocmd("VimEnter", {
-    callback = function()
-        local ok, winbar = pcall(require, "plugins.winbarEl")
-        if ok then
-            winbar.setup()
-        end
-    end
-})
 
