@@ -3,7 +3,7 @@ local M = {}
 -- State persistent
 M.opened_items = M.opened_items or {}
 M.current_index = M.current_index or 0
-M.max_history = M.max_history or 0          -- 0 = unlimited
+M.max_history = M.max_history or 50
 M.show_full_path = M.show_full_path or false
 M.show_only_current = M.show_only_current or false
 
@@ -14,12 +14,10 @@ M.config = {
     enable_popup_filter = true,
     window_size = 3,
     show_quit_messages = true,
-    clean_cmd_history = true,   -- jika true, mapping qq/qw akan mencatat BarExit/BarSaveExit di history
 }
 
--- Cache untuk performance
+-- Cache
 local winbar_cache = {}
----@diagnostic disable-next-line: unused-local
 local cwd = vim.fn.getcwd()
 local original_content_cache = {}
 local unsaved_new_files = {}
@@ -55,11 +53,9 @@ local function is_buffer_modified(buf_id, file_path)
     if not buf_id or buf_id == -1 then return false end
     if not vim.api.nvim_buf_is_loaded(buf_id) then return false end
     if unsaved_new_files[buf_id] then return true end
-
     local buf_lines = vim.api.nvim_buf_get_lines(buf_id, 0, -1, false)
     local current_content = table.concat(buf_lines, "\n")
     current_content = normalize_content(current_content)
-
     if original_content_cache[buf_id] then
         return current_content ~= original_content_cache[buf_id]
     end
@@ -88,7 +84,7 @@ local function update_original_content_after_save(buf_id, file_path)
 end
 
 --------------------------------------------------------------------
--- HIGHLIGHTS & ICONS
+-- HIGHLIGHTS & ICONS (persis versi pertama)
 --------------------------------------------------------------------
 local function setup_highlights()
     local bg = vim.api.nvim_get_hl_by_name("Normal", true).background
@@ -100,11 +96,22 @@ local function setup_highlights()
     vim.api.nvim_set_hl(0, "WinbarSep",          { fg = "#444444", bg = bg })
 
     local icon_colors = {
-        folder = "#3A5F7F", file = "#5F87AF", lua = "#56a0d3", html = "#e34f26",
-        css = "#56B6C2", js = "#f7df1e", json = "#f7df1e", php = "#a286c0",
-        python = "#3572A5", java = "#e76f51", cpp = "#56B6C2", go = "#00ADD8",
-        rust = "#DEA584", ruby = "#701516",
+        folder = "#3A5F7F",
+        file   = "#5F87AF",
+        lua    = "#56a0d3",
+        html   = "#e34f26",
+        css    = "#56B6C2",
+        js     = "#f7df1e",
+        json   = "#f7df1e",
+        php    = "#a286c0",
+        python = "#3572A5",
+        java   = "#e76f51",
+        cpp    = "#56B6C2",
+        go     = "#00ADD8",
+        rust   = "#DEA584",
+        ruby   = "#701516",
     }
+
     M.icons = {
         folder = { icon = "  ", color = icon_colors.folder },
         file   = { icon = " 󰈔 ", color = icon_colors.file },
@@ -121,6 +128,7 @@ local function setup_highlights()
         rust   = { icon = "  ", color = icon_colors.rust },
         ruby   = { icon = "  ", color = icon_colors.ruby },
     }
+
     for ext, icon_data in pairs(M.icons) do
         vim.api.nvim_set_hl(0, "WinbarIcon_" .. ext, { fg = icon_data.color, bg = bg })
     end
@@ -187,7 +195,7 @@ local function get_relative_path(full_path)
 end
 
 --------------------------------------------------------------------
--- WINBAR LOGIC
+-- WINBAR LOGIC (persis versi pertama)
 --------------------------------------------------------------------
 _G.winbarEl_logic = function()
     if is_window_filtered() or #M.opened_items == 0 or not M.opened_items[M.current_index] then
@@ -198,7 +206,7 @@ _G.winbarEl_logic = function()
     if winbar_cache[cache_key] then return winbar_cache[cache_key] end
 
     local parts = {}
-    local sep = " %#WinbarSep#┃%*"
+    local sep = " %#WinbarSep#┃%*"   -- spasi sebelum, tanpa spasi setelah
     local window_size = M.config.window_size
 
     local function build_label(item, active)
@@ -214,28 +222,30 @@ _G.winbarEl_logic = function()
         return label
     end
 
-    -- Mode full path (Ctrl+Up) dengan separator " > "
+    -- Mode full path (Ctrl+Up) dengan folder_sep "  "
     if M.show_only_current and M.show_full_path then
         local item = M.opened_items[M.current_index]
         local text = build_label(item, true)
         local rel_path = get_relative_path(item.path)
         local folder_text = ""
-        local folder_sep = " "
+        local folder_sep = "  "
 
         if rel_path ~= "" and rel_path ~= item.label then
             local dir_path = vim.fn.fnamemodify(rel_path, ":h")
             if dir_path ~= "." and dir_path ~= "" then
                 local folders = {}
                 for folder in dir_path:gmatch("[^/]+") do table.insert(folders, folder) end
-                for _, folder in ipairs(folders) do
-                    if folder_text == "" then
+                for i, folder in ipairs(folders) do
+                    if i == 1 then
                         folder_text = get_icon(folder, true) .. " " .. "%#WinbarFolder#" .. folder .. "%*"
                     else
                         folder_text = folder_text .. folder_sep .. get_icon(folder, true) .. " " .. "%#WinbarFolder#" .. folder .. "%*"
                     end
                 end
             end
-            if folder_text ~= "" then folder_text = folder_text .. folder_sep end
+            if folder_text ~= "" then
+                folder_text = folder_text .. folder_sep
+            end
         end
         local content = folder_text .. text
         winbar_cache[cache_key] = content
@@ -251,11 +261,19 @@ _G.winbarEl_logic = function()
         local start_index = math.max(M.current_index - 1, 1)
         local end_index = math.min(start_index + window_size - 1, #M.opened_items)
         start_index = math.max(end_index - window_size + 1, 1)
-        if start_index > 1 then table.insert(parts, "%#WinbarInactiveFile#  %*") end
+
+        if start_index > 1 then
+            table.insert(parts, "%#WinbarInactiveFile#  %*")
+        end
+
         for i = start_index, end_index do
             table.insert(parts, build_label(M.opened_items[i], i == M.current_index))
         end
-        if end_index < #M.opened_items then table.insert(parts, "%#WinbarInactiveFile#  %*") end
+
+        if end_index < #M.opened_items then
+            table.insert(parts, "%#WinbarInactiveFile#  %*")
+        end
+
         local content = table.concat(parts, sep)
         winbar_cache[cache_key] = content
         return content
@@ -294,20 +312,32 @@ local function apply_tracking()
 end
 
 --------------------------------------------------------------------
--- SMART CLOSE
+-- SMART CLOSE (dengan manipulasi history agar tercatat q/wq)
 --------------------------------------------------------------------
 M.smart_close = function(save_first)
     local api = vim.api
     local buf_id = api.nvim_get_current_buf()
     local is_file = (vim.bo[buf_id].buftype == "" and api.nvim_buf_get_name(buf_id) ~= "")
+    local cmd_label = save_first and "wq" or "q"
 
+    -- Jika bukan file atau hanya satu item, jalankan quit normal
     if not is_file or #M.opened_items <= 1 then
         if #M.opened_items <= 1 then M.opened_items = {}; M.current_index = 0 end
         vim.cmd(save_first and "confirm wq" or "confirm q")
         return
     end
 
-    if save_first and vim.bo.modified then vim.cmd("w") end
+    -- Jika buffer dimodifikasi dan kita tidak menyimpan (save_first = false),
+    -- biarkan Neovim menangani dengan confirm q (akan meminta konfirmasi)
+    if not save_first and vim.bo.modified then
+        vim.cmd("confirm q")
+        return
+    end
+
+    -- Lanjutkan dengan smart close
+    if save_first and vim.bo.modified then
+        vim.cmd("w")
+    end
 
     local old_buf = buf_id
     local current_path = api.nvim_buf_get_name(buf_id)
@@ -340,21 +370,15 @@ M.smart_close = function(save_first)
         api.nvim_echo({{ pesan, "DiagnosticOk" }}, false, {})
     end
 
-    -- Manipulasi history command: ganti dengan perintah pendek jika diaktifkan
-    if M.config.clean_cmd_history then
-        vim.fn.histdel("cmd", -1)   -- hapus entri mapping yang panjang
-        if save_first then
-            vim.fn.histadd("cmd", "BarSaveExit")
-        else
-            vim.fn.histadd("cmd", "BarExit")
-        end
-    end
+    -- Manipulasi history: hapus entri terakhir (BarExit/BarSaveExit) dan tambahkan q/wq
+    vim.fn.histdel("cmd", -1)
+    vim.fn.histadd("cmd", cmd_label)
 
     winbar_cache = {}
 end
 
 --------------------------------------------------------------------
--- SYNC MODIFIED FLAG
+-- AUTO SYNC MODIFIED
 --------------------------------------------------------------------
 local function sync_modified_flag()
     if not M.config.auto_save then return end
@@ -367,13 +391,15 @@ local function sync_modified_flag()
 end
 
 --------------------------------------------------------------------
--- COMMAND LINE HIJACK (untuk :q dan :wq)
+-- ABBREVIATION untuk :q dan :wq (mengarah ke :BarExit / :BarSaveExit)
 --------------------------------------------------------------------
-local function setup_command_hijack()
-    vim.api.nvim_set_keymap('c', '<CR>',
-        [[getcmdtype() == ':' && getcmdline() == 'q' ? '<C-u>lua require("plugins.winbarEl").smart_close(false)<CR>' : (getcmdtype() == ':' && getcmdline() == 'wq' ? '<C-u>lua require("plugins.winbarEl").smart_close(true)<CR>' : '<CR>')]],
-        { expr = true, noremap = true }
-    )
+local function setup_command_abbrev()
+    vim.cmd([[
+        cnoreabbrev <expr> q  (getcmdtype() == ':' && getcmdline() =~ '^q *$') ? 'BarExit' : 'q'
+    ]])
+    vim.cmd([[
+        cnoreabbrev <expr> wq (getcmdtype() == ':' && getcmdline() =~ '^wq *$') ? 'BarSaveExit' : 'wq'
+    ]])
 end
 
 --------------------------------------------------------------------
@@ -403,7 +429,6 @@ end
 -- SETUP
 --------------------------------------------------------------------
 function M.setup(user_config)
-    ---@diagnostic disable-next-line: unused-local
     cwd = vim.fn.getcwd()
     if user_config then
         for k, v in pairs(user_config) do M.config[k] = v end
@@ -411,11 +436,7 @@ function M.setup(user_config)
 
     local api = vim.api
     setup_highlights()
-    setup_command_hijack()
-
-    -- User commands pendek untuk smart close
-    vim.api.nvim_create_user_command("BarExit", function() M.smart_close(false) end, {})
-    vim.api.nvim_create_user_command("BarSaveExit", function() M.smart_close(true) end, {})
+    setup_command_abbrev()
 
     local group = api.nvim_create_augroup("WinbarEl", { clear = true })
 
@@ -480,7 +501,6 @@ function M.setup(user_config)
 
     api.nvim_create_autocmd("DirChanged", {
         group = group,
-        ---@diagnostic disable-next-line: unused-local
         callback = function() cwd = vim.fn.getcwd(); winbar_cache = {}; update_winbar() end
     })
 
@@ -499,7 +519,6 @@ function M.setup(user_config)
         callback = function(args) original_content_cache[args.buf] = nil; unsaved_new_files[args.buf] = nil end
     })
 
-    -- Key mappings
     local opts = { silent = true, noremap = true }
     vim.keymap.set('n', '<C-Right>', function() goto_item(M.current_index + 1) end, opts)
     vim.keymap.set('n', '<C-Left>',  function() goto_item(M.current_index - 1) end, opts)
@@ -519,7 +538,8 @@ function M.setup(user_config)
     vim.keymap.set('n', 'qq', function() M.smart_close(false) end, opts)
     vim.keymap.set('n', 'qw', function() M.smart_close(true) end, opts)
 
-    -- Custom commands (sudah didefinisikan di atas, tapi bisa juga ditambahkan sebagai alias)
+    vim.api.nvim_create_user_command("BarExit", function() M.smart_close(false) end, {})
+    vim.api.nvim_create_user_command("BarSaveExit", function() M.smart_close(true) end, {})
     vim.api.nvim_create_user_command("Q", function() M.smart_close(false) end, {})
     vim.api.nvim_create_user_command("WQ", function() M.smart_close(true) end, {})
 
