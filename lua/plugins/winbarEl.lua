@@ -207,7 +207,7 @@ _G.winbarEl_logic = function()
         local buf = vim.fn.bufnr(item.path)
         local modified = (buf ~= -1 and vim.api.nvim_buf_is_loaded(buf) and is_buffer_modified(buf, item.path))
         if modified then
-            label = label .. hl_group .. item.label .. "%#WinbarModified#*%*%*"
+            label = label .. hl_group .. item.label .. "%#WinbarModified# 󱓈 %*%*"
         else
             label = label .. hl_group .. item.label .. "%*"
         end
