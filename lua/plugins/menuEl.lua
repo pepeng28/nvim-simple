@@ -1,29 +1,37 @@
 -- Daftar shortcut
 local shortcuts = {
+  { icon = "  ", desc = "Explore File", cmd = function() vim.cmd("NvimTreeToggle") end, color = "Yellow" },
   { icon = "  ", desc = "Buat File Baru", cmd = function()
       local filename = vim.fn.input("Nama file baru: ")
       if filename ~= "" then
         vim.cmd("e " .. filename)
       end
-    end, color = "Blue" },  -- warna biru
-  { icon = "  ", desc = "Explore File", cmd = function() vim.cmd("NvimTreeToggle") end, color = "Yellow" },
+    end, color = "Green" },
   { icon = "  ", desc = "Save File", cmd = function() vim.cmd("write") end, color = "Green" },
   { icon = "  ", desc = "Quit Nvim", cmd = function() vim.cmd("quit") end, color = "Red" },
-  { icon = "  ", desc = "Terminal Float", cmd = function() vim.cmd("ToggleTerm direction=float") end, color = "Cyan" },
-  { icon = "  ", desc = "Terminal Horizontal", cmd = function() vim.cmd("ToggleTerm direction=horizontal") end, color = "Cyan" },
-  { icon = "  ", desc = "Plugins", cmd = function() vim.cmd("Mason") end, color = "Green" },
+  { icon = "  ", desc = "Terminal Float", cmd = function() vim.cmd("ToggleTerm direction=float") end, color = "Cyan" },
+  { icon = "  ", desc = "Terminal Horizontal", cmd = function() vim.cmd("ToggleTerm direction=horizontal") end, color = "Cyan" },
+  { icon = "  ", desc = "Mason (Plugin Manager)", cmd = function() vim.cmd("Mason") end, color = "Green" },
+  { icon = " 󰂠 ", desc = "Lazy (Plugin Manager)", cmd = function() vim.cmd("Lazy") end, color = "Blue" },
 }
 
 -- State menu popup
 local menu_state = { buf = nil, win = nil }
 
--- Warna highlight
+-- Definisikan highlight group kustom dengan warna tetap
+vim.api.nvim_set_hl(0, "ShortcutRed",    { fg = "#FF3333", bold = true })
+vim.api.nvim_set_hl(0, "ShortcutGreen",  { fg = "#33FF33", bold = true })
+vim.api.nvim_set_hl(0, "ShortcutYellow", { fg = "#FFFF33", bold = true })
+vim.api.nvim_set_hl(0, "ShortcutCyan",   { fg = "#33FFFF", bold = true })
+vim.api.nvim_set_hl(0, "ShortcutBlue",   { fg = "#3333FF", bold = true })
+
+-- Pemetaan warna ke highlight group
 local hl_colors = {
-  Red = "ErrorMsg",
-  Green = "String",
-  Yellow = "WarningMsg",
-  Cyan = "Question",
-  Blue = "Identifier",  -- highlight untuk biru
+  Red   = "ShortcutRed",
+  Green = "ShortcutGreen",
+  Yellow= "ShortcutYellow",
+  Cyan  = "ShortcutCyan",
+  Blue  = "ShortcutBlue",
 }
 
 -- Fungsi toggle menu
@@ -51,9 +59,9 @@ local function toggle_menu()
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.api.nvim_buf_set_option(buf, "modifiable", false)
 
-  -- Tentukan posisi menu
-  local width = 40
-  local height = math.min(#lines, 10)
+  -- Tentukan posisi menu (maksimal tinggi 5 baris)
+  local width = 50
+  local height = math.min(#lines, 5)
   local editor_height = vim.api.nvim_get_option("lines") - vim.api.nvim_get_option("cmdheight") - 1
   local row = math.max(0, editor_height - height - 2)
   local col = math.max(0, math.floor((vim.o.columns - width) / 2))
@@ -86,30 +94,20 @@ local function toggle_menu()
   start_col = start_col or (#shortcuts[1].icon + 1)
   vim.api.nvim_win_set_cursor(win, {1, start_col})
 
-  -- Mapping Enter untuk jalankan shortcut (dengan penanganan khusus untuk baris pertama)
+  -- ============================================================
+  -- 1. Mapping untuk navigasi dan aksi yang diizinkan
+  -- ============================================================
   vim.keymap.set("n", "<CR>", function()
     local line = vim.api.nvim_win_get_cursor(win)[1]
     local choice = shortcuts[line]
     if choice then
-      if line == 1 then
-        local filename = vim.fn.input("Nama file baru: ")
-        if filename ~= "" then
-          vim.api.nvim_win_close(win, true)
-          menu_state.win = nil
-          menu_state.buf = nil
-          vim.cmd("e " .. filename)
-        end
-        -- Jika batal, tidak lakukan apa-apa, popup tetap terbuka
-      else
-        vim.api.nvim_win_close(win, true)
-        menu_state.win = nil
-        menu_state.buf = nil
-        choice.cmd()
-      end
+      vim.api.nvim_win_close(win, true)
+      menu_state.win = nil
+      menu_state.buf = nil
+      choice.cmd()
     end
   end, { buffer = buf })
 
-  -- Navigasi atas/bawah
   vim.keymap.set("n", "<Down>", function()
     local cur = vim.api.nvim_win_get_cursor(win)
     local next_line = math.min(cur[1] + 1, #lines)
@@ -122,13 +120,6 @@ local function toggle_menu()
     vim.api.nvim_win_set_cursor(win, {prev_line, cur[2]})
   end, { buffer = buf })
 
-  -- Nonaktifkan tombol yang bisa memicu mode insert (agar tidak error E21)
-  local disable_keys = { "i", "I", "a", "A", "o", "O" }
-  for _, key in ipairs(disable_keys) do
-    vim.keymap.set("n", key, "<Nop>", { buffer = buf })
-  end
-
-  -- Tombol untuk keluar dari menu
   vim.keymap.set("n", "q", function()
     vim.api.nvim_win_close(win, true)
     menu_state.win = nil
@@ -141,6 +132,39 @@ local function toggle_menu()
     menu_state.buf = nil
   end, { buffer = buf })
 
+  -- ============================================================
+  -- 2. Nonaktifkan semua tombol lain agar tidak memicu error
+  -- ============================================================
+  -- Daftar semua tombol yang ingin dinonaktifkan (huruf, angka, simbol, spasi)
+  local disabled_keys = {
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    '-', '=', '[', ']', '\\', ';', "'", ',', '.', '/',
+    '<', '>', '?', ':', '"', '{', '}', '|', '+', '_', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')',
+    '`', '~'
+  }
+
+  -- Tombol yang tetap diizinkan (sudah memiliki mapping di atas)
+  local allowed_keys = { '<CR>', '<Up>', '<Down>', 'q', '<Esc>' }
+
+  for _, key in ipairs(disabled_keys) do
+    local is_allowed = false
+    for _, allowed in ipairs(allowed_keys) do
+      if key == allowed then
+        is_allowed = true
+        break
+      end
+    end
+    if not is_allowed then
+      -- Mapping <Nop> untuk semua tombol lain, hanya di buffer ini
+      pcall(vim.keymap.set, 'n', key, '<Nop>', { buffer = buf, nowait = true, silent = true })
+    end
+  end
+
+  -- Simpan state menu
   menu_state.buf = buf
   menu_state.win = win
 end

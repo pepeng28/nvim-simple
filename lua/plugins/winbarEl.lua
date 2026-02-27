@@ -14,6 +14,7 @@ M.config = {
     enable_popup_filter = true,
     window_size = 3,
     show_quit_messages = true,
+    winbar_bg = nil,   -- untuk mengatur background
 }
 
 -- Cache
@@ -84,16 +85,23 @@ local function update_original_content_after_save(buf_id, file_path)
 end
 
 --------------------------------------------------------------------
--- HIGHLIGHTS & ICONS (persis versi pertama)
+-- HIGHLIGHTS & ICONS (dengan background dari konfigurasi)
 --------------------------------------------------------------------
 local function setup_highlights()
-    local bg = vim.api.nvim_get_hl_by_name("Normal", true).background
-    bg = bg and string.format("#%06x", bg) or "NONE"
+    local bg
+    if M.config.winbar_bg then
+        bg = M.config.winbar_bg
+    else
+        bg = vim.api.nvim_get_hl_by_name("Normal", true).background
+        bg = bg and string.format("#%06x", bg) or "NONE"
+    end
+
     vim.api.nvim_set_hl(0, "WinbarActiveFile",   { fg = "#FFFF00", bg = bg, bold = true })
     vim.api.nvim_set_hl(0, "WinbarInactiveFile", { fg = "#5F87AF", bg = bg })
     vim.api.nvim_set_hl(0, "WinbarFolder",       { fg = "#3A5F7F", bg = bg })
     vim.api.nvim_set_hl(0, "WinbarModified",     { fg = "#FF5555", bg = bg, bold = true })
     vim.api.nvim_set_hl(0, "WinbarSep",          { fg = "#444444", bg = bg })
+    vim.api.nvim_set_hl(0, "WinbarFiller",       { bg = bg })   -- untuk mengisi sisa ruang
 
     local icon_colors = {
         folder = "#3A5F7F",
@@ -138,7 +146,7 @@ local function get_icon(path, is_folder, bufnr)
     if not M.config.show_icons then return "" end
     if not path or path == "" then return "" end
     if is_folder then
-        return "%#WinbarIcon_folder#" .. (M.icons.folder.icon or "") .. "%*"
+        return "%#WinbarIcon_folder#" .. M.icons.folder.icon .. "%*"
     end
     local ext = path:match("^.+%.(.+)$")
     local ft = vim.api.nvim_buf_get_option(bufnr or 0, "filetype")
@@ -195,7 +203,7 @@ local function get_relative_path(full_path)
 end
 
 --------------------------------------------------------------------
--- WINBAR LOGIC (persis versi pertama)
+-- WINBAR LOGIC (dengan semua spasi terbungkus dan filler)
 --------------------------------------------------------------------
 _G.winbarEl_logic = function()
     if is_window_filtered() or #M.opened_items == 0 or not M.opened_items[M.current_index] then
@@ -206,29 +214,29 @@ _G.winbarEl_logic = function()
     if winbar_cache[cache_key] then return winbar_cache[cache_key] end
 
     local parts = {}
-    local sep = " %#WinbarSep#┃%*"   -- spasi sebelum, tanpa spasi setelah
+    --local sep = "%#WinbarSep# ┃%*"   -- spasi di dalam group
+    local sep = "%#WinbarSep# %*"   -- spasi di dalam group
     local window_size = M.config.window_size
 
     local function build_label(item, active)
-        local label = get_icon(item.path, false, vim.fn.bufnr(item.path)) .. " "
+        local icon = get_icon(item.path, false, vim.fn.bufnr(item.path))  -- tanpa spasi
         local hl_group = active and "%#WinbarActiveFile#" or "%#WinbarInactiveFile#"
         local buf = vim.fn.bufnr(item.path)
         local modified = (buf ~= -1 and vim.api.nvim_buf_is_loaded(buf) and is_buffer_modified(buf, item.path))
         if modified then
-            label = label .. hl_group .. item.label .. "%#WinbarModified# 󱓈 %*%*"
+            -- spasi setelah ikon dimasukkan ke group teks
+            return icon .. hl_group .. " " .. item.label .. "%#WinbarModified# 󱓈 %*%*"
         else
-            label = label .. hl_group .. item.label .. "%*"
+            return icon .. hl_group .. " " .. item.label .. "%*"
         end
-        return label
     end
 
-    -- Mode full path (Ctrl+Up) dengan folder_sep "  "
+    -- Mode full path (Ctrl+Up) dengan semua spasi dan separator terbungkus
     if M.show_only_current and M.show_full_path then
         local item = M.opened_items[M.current_index]
         local text = build_label(item, true)
         local rel_path = get_relative_path(item.path)
         local folder_text = ""
-        local folder_sep = "  "
 
         if rel_path ~= "" and rel_path ~= item.label then
             local dir_path = vim.fn.fnamemodify(rel_path, ":h")
@@ -237,23 +245,27 @@ _G.winbarEl_logic = function()
                 for folder in dir_path:gmatch("[^/]+") do table.insert(folders, folder) end
                 for i, folder in ipairs(folders) do
                     if i == 1 then
-                        folder_text = get_icon(folder, true) .. " " .. "%#WinbarFolder#" .. folder .. "%*"
+                        folder_text = get_icon(folder, true) .. "%#WinbarFolder# " .. folder .. "%*"
                     else
-                        folder_text = folder_text .. folder_sep .. get_icon(folder, true) .. " " .. "%#WinbarFolder#" .. folder .. "%*"
+                        folder_text = folder_text .. "%#WinbarFolder#  %*" .. get_icon(folder, true) .. "%#WinbarFolder# " .. folder .. "%*"
                     end
                 end
             end
             if folder_text ~= "" then
-                folder_text = folder_text .. folder_sep
+                folder_text = folder_text .. "%#WinbarFolder#  %*"
             end
         end
         local content = folder_text .. text
+        -- Tambahkan filler untuk memenuhi lebar window
+        content = content .. "%#WinbarFiller#%="
         winbar_cache[cache_key] = content
         return content
 
     elseif M.show_only_current then
         local item = M.opened_items[M.current_index]
         local text = build_label(item, true)
+        -- Tambahkan filler
+        text = text .. "%#WinbarFiller#%="
         winbar_cache[cache_key] = text
         return text
 
@@ -275,6 +287,8 @@ _G.winbarEl_logic = function()
         end
 
         local content = table.concat(parts, sep)
+        -- Tambahkan filler
+        content = content .. "%#WinbarFiller#%="
         winbar_cache[cache_key] = content
         return content
     end

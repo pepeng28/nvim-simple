@@ -55,4 +55,32 @@ vim.api.nvim_set_keymap('n', '<C-q>', ':q!<CR>', { noremap = true, silent = true
 -- Matikan tombol Space di normal mode
 --vim.api.nvim_set_keymap('n', '<Space>', '<Nop>', { noremap = true, silent = true })
 
+local function only_empty()
+  return vim.fn.argc() == 0
+end
 
+-- Saat start: jika tanpa argumen, sembunyikan semua dekorasi
+vim.api.nvim_create_autocmd("VimEnter", {
+  callback = function()
+    if only_empty() then
+      vim.opt.laststatus = 0   -- 0 = hilangkan status line
+      vim.opt.showmode = false
+      vim.opt.ruler = false
+      vim.opt.showcmd = false
+    end
+  end,
+})
+
+-- Segera setelah ada file dibaca atau dibuat, kembalikan ke normal
+vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
+  callback = function()
+    vim.opt.laststatus = 3     -- tampilkan status line global
+    vim.opt.showmode = true
+    vim.opt.ruler = true
+    vim.opt.showcmd = true
+  end,
+})
+
+-- Opsional: jika semua buffer ditutup dan kembali ke keadaan kosong,
+-- kita bisa mengembalikan keadaan seperti startup.
+-- Tapi biasanya tidak terlalu diperlukan.

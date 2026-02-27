@@ -1,36 +1,30 @@
+-- setupEl.lua
+-- =====================================================
+-- Plugin Manager & Plugins Setup
+-- =====================================================
 
-
--- =========================
--- 1. Lazy.nvim (Plugin Manager)
--- =========================
+-- Path Lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
- vim.fn.system({
-	 "git",
-   "clone",
-	 "--filter=blob:none",
-   "https://github.com/folke/lazy.nvim.git",
-	 "--branch=stable",
-	 lazypath,
- })
+  vim.fn.system({
+    "git",
+    "clone",
+    "--filter=blob:none",
+    "https://github.com/folke/lazy.nvim.git",
+    "--branch=stable",
+    lazypath,
+  })
 end
-
-vim.g.mapleader = " "
 vim.opt.rtp:prepend(lazypath)
 
--- =========================================
--- Termux Modern Neovim Config
--- HTML / JS/TS / Python + Mason + LSP + Snippets + nvim-cmp + Treesitter + Lualine + Telescope
--- Fully functional, autocomplete HTML tags, snippets ready
--- =========================================
--- Set tags file untuk Neovim
--- -- Set leader
--- =========================
--- 2. Plugins
--- =========================
+-- Setup plugins
 require("lazy").setup({
 
-	{ import = "plugins.lazy" },
+  -- Import custom plugin configs
+  { import = "plugins.lazy" },
+  -- LSP Symbols / Navic
+  { "SmiteshP/nvim-navic" },
+  { "famiu/feline.nvim" },
   -- Telescope
   { "nvim-telescope/telescope.nvim", dependencies = { "nvim-lua/plenary.nvim" } },
 
@@ -38,124 +32,90 @@ require("lazy").setup({
   { "neovim/nvim-lspconfig" },
   { "williamboman/mason.nvim" },
   { "williamboman/mason-lspconfig.nvim" },
-  -- LSP symbols
-  { "SmiteshP/nvim-navic" },
 
   -- Completion
   { "hrsh7th/nvim-cmp" },
   { "hrsh7th/cmp-nvim-lsp" },
 
   -- Snippets
-  { "hrsh7th/cmp-vsnip" },
   { "hrsh7th/vim-vsnip" },
-  { "rafamadriz/friendly-snippets" }, -- snippet umum HTML/JS/Python
+  { "rafamadriz/friendly-snippets" },
 
   -- Theme
- -- { "folke/tokyonight.nvim" },
-{
-  "navarasu/onedark.nvim",
-  priority = 1000,
-  config = function()
-    require("onedark").setup({
-      style = "deep",
-    })
-    require("onedark").load()
-  end,
-},
-
-  -- Status line
-  { "nvim-lualine/lualine.nvim" },
-
-----------------------------------------------------------------
-  -- NVIM TREE = SATU-SATUNYA FILE EXPLORER Dan Icon Global
-  ----------------------------------------------------------------
- {
-  'nvim-tree/nvim-tree.lua',
-  dependencies = {
-    'nvim-tree/nvim-web-devicons',
+  {
+    "navarasu/onedark.nvim",
+    priority = 1000,
+    config = function()
+      require("onedark").setup({ style = "deep" })
+      require("onedark").load()
+    end,
   },
 
-  config = function()
-
-    vim.keymap.set('n', '<C-e>', ':NvimTreeToggle<CR>', {
-      noremap = true,
-      silent = true
-    })
-
-    require('nvim-tree').setup {
-
-      view = {
-        side = 'left',
-        width = math.floor(vim.o.columns / 2),
-        preserve_window_proportions = true,
-      },
-
-      filters = {
-        dotfiles = false,
-      },
-
-      renderer = {
-        icons = {
-          show = {
-            file = true,
-            folder = true,
-            folder_arrow = true,
-            git = true,
-          },
-
-          -- INI CUSTOM KHUSUS NVIM-TREE SAJA
-          glyphs = {
-            default = " ",
-            folder = {
-              arrow_closed = " ",
-              arrow_open   = " ",
-              default      = " ",
-              open         = " ",
-              empty        = " ",
-              empty_open   = " ",
-              symlink      = " ",
-              symlink_open = " ",
-            },
-          },
+  -- NVIM TREE
+  {
+    "nvim-tree/nvim-tree.lua",
+    dependencies = { "nvim-tree/nvim-web-devicons" },
+    config = function()
+      vim.keymap.set("n", "<C-e>", ":NvimTreeToggle<CR>", { noremap = true, silent = true })
+      require("nvim-tree").setup({
+        view = {
+          side = "left",
+          width = math.floor(vim.o.columns / 2),
+          preserve_window_proportions = true,
         },
-      },
-    }
-  end,
-},
--- kalau pakai lazy.nvim
-{
-  "akinsho/toggleterm.nvim",
-  version = "*",
-  config = function()
-    require("toggleterm").setup{
-      -- pengaturan default, bisa dikustom
-      size = 15,
-      open_mapping = [[<c-\>]],
-      direction = "horizontal",
-    }
-  end
-},
-}) --batas nya _
+        filters = { dotfiles = false },
+      })
+    end,
+  },
+
+  -- ToggleTerm
+  {
+    "akinsho/toggleterm.nvim",
+    version = "*",
+    config = function()
+      require("toggleterm").setup({
+        size = 15,
+        open_mapping = [[<c-\>]],
+        direction = "horizontal",
+      })
+    end,
+  },
+
+  -- Lualine (commented supaya gak konflik sama Feline)
+  -- {
+  --   "nvim-lualine/lualine.nvim",
+  --   config = function()
+  --     require('lualine').setup {
+  --       options = {
+  --         theme = 'onedark',
+  --         section_separators = '',
+  --         component_separators = '',
+  --         globalstatus = true,
+  --       },
+  --       sections = {
+  --         lualine_a = {'mode'},
+  --         lualine_b = {'branch', 'diagnostics'},
+  --         lualine_c = {'filename'},
+  --         lualine_x = {'encoding', 'filetype'},
+  --         lualine_y = {'progress'},
+  --         lualine_z = {'location'}
+  --       }
+  --     }
+  --   end
+  -- }
+
+})
 
 -- panggil konfigurasi LSP
 require("lsp")
 require("plugins")
-
--- 3. Theme
+require("statusline")  -- <-- panggil statusline Feline
+require('polish')
 -- =========================
---vim.o.termguicolors = true
---vim.cmd([[colorscheme tokyonight-storm]])
-
-
--- =========================
--- 4. Line Numbers
+-- Editor Options
 -- =========================
 vim.wo.number = true
 vim.wo.relativenumber = true
-
--- =========================
--- 5. Editor Options
--- =========================
 vim.o.expandtab = true
 vim.o.shiftwidth = 2
 vim.o.tabstop = 2
@@ -163,10 +123,10 @@ vim.o.smartindent = true
 vim.o.wrap = false
 vim.o.cursorline = true
 vim.o.scrolloff = 8
-vim.o.showmode = false -- lualine menampilkan mode
+vim.o.showmode = false -- Feline menampilkan mode
 
 -- =========================
--- 10. Highlight Yank
+-- Highlight Yank
 -- =========================
 vim.cmd [[
   augroup YankHighlight
@@ -174,26 +134,5 @@ vim.cmd [[
     autocmd TextYankPost * silent! lua vim.highlight.on_yank()
   augroup END
 ]]
-
--- =========================
--- 11. Status Line
--- =========================
-require('lualine').setup {
-  options = {
-    --theme = 'tokyonight',
-    theme = 'onedark',
-    section_separators = '',
-    component_separators = '',
-    globalstatus = true,
-  },
-  sections = {
-    lualine_a = {'mode'},
-    lualine_b = {'branch', 'diagnostics'},
-    lualine_c = {'filename'},
-    lualine_x = {'encoding', 'filetype'},
-    lualine_y = {'progress'},
-    lualine_z = {'location'}
-  }
-}
 
 
